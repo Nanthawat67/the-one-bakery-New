@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Packing - THE ONE Bakery</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+
+<body>
+  <header class="top">
+    <b>THE ONE Bakery · Packing</b>
+    <a href="#" onclick="logout()">ออกจากระบบ</a>
+  </header>
+
+  <main class="wrap">
+    <div class="notice">
+      ฝ่ายแพ็กเห็นเฉพาะออเดอร์ที่ผ่านการผลิตแล้ว
+    </div>
+
+    <div id="orders" class="grid"></div>
+  </main>
+
+  <script src="/js/api.js"></script>
+
+  <script>
+    requireRole('packing');
+
+    async function load() {
+      const os = await api('/orders');
+
+      orders.innerHTML =
+        os.map(o => `
+          <div class="card">
+            <h3>
+              #${o.daily_no || o.id} ${esc(o.customer_name)}
+            </h3>
+
+            <p>
+              ${o.items
+                .map(i => `${esc(i.name)} × ${i.quantity}`)
+                .join('<br>')}
+            </p>
+
+            <span class="badge">
+              ${o.status}
+            </span>
+
+            ${
+              o.status === 'ready_for_packing'
+                ? `
+                  <button
+                    class="btn"
+                    onclick="next(${o.id},'packed')"
+                  >
+                    แพ็กเสร็จ
+                  </button>
+                `
+                : ''
+            }
+
+            ${
+              o.status === 'packed'
+                ? `
+                  <button
+                    class="btn success"
+                    onclick="next(${o.id},'picked_up')"
+                  >
+                    ลูกค้ารับแล้ว
+                  </button>
+                `
+                : ''
+            }
+          </div>
+        `).join('') ||
+        '<div class="card">ยังไม่มีงานแพ็ก</div>';
+    }
+
+    async function next(id, status) {
+      try {
+        await api('/orders/' + id + '/status', {
+          method: 'POST',
+          body: JSON.stringify({ status })
+        });
+
+        load();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>

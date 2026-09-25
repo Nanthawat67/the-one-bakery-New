@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ติดตามออเดอร์</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+
+<body>
+  <header class="top">
+    <b>THE ONE Bakery</b>
+    <a href="/">สั่งสินค้า</a>
+  </header>
+
+  <main class="wrap">
+    <div class="card">
+      <h2>ติดตามออเดอร์</h2>
+
+      <form id="f" class="row">
+        <input
+          id="id"
+          type="number"
+          placeholder="หมายเลขออเดอร์"
+          required
+        >
+        <button class="btn">ตรวจสอบ</button>
+      </form>
+
+      <div id="result" style="margin-top:16px"></div>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+
+  <script>
+    f.onsubmit = async e => {
+      e.preventDefault();
+
+      try {
+        const o = await api('/orders/track/' + id.value);
+
+        result.innerHTML = `
+          <h3>ออเดอร์ #${o.daily_no || o.id}</h3>
+          <div class="muted2">รหัสระบบ: ${o.id}</div>
+          <p>
+            สถานะ:
+            <span class="badge">${esc(o.status)}</span>
+          </p>
+          <h4>ประวัติ</h4>
+          ${o.history
+            .map(
+              h =>
+                `<div>
+                  ${new Date(h.changed_at).toLocaleString('th-TH')}
+                  · ${esc(h.to_status)}
+                  · ${esc(h.display_name || 'ลูกค้า')}
+                </div>`
+            )
+            .join('')}
+        `;
+      } catch (x) {
+        result.textContent = x.message;
+      }
+    };
+  </script>
+</body>
+</html>

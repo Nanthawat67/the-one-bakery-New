@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>THE ONE Bakery - Login</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+
+<body>
+  <div class="wrap" style="max-width:520px">
+    <div class="hero">
+      <h1>THE ONE Bakery</h1>
+      <p class="muted">ระบบจัดการออเดอร์และวางแผนการผลิต</p>
+    </div>
+
+    <div class="card">
+      <h2>เข้าสู่ระบบจัดการร้าน</h2>
+
+      <form id="f" class="form">
+        <label>
+          บัญชี
+          <select id="preset">
+            <option value="admin">Admin</option>
+            <option value="kitchen">Kitchen</option>
+            <option value="packing">Packing</option>
+          </select>
+        </label>
+
+        <label>
+          Username
+          <input id="username" required>
+        </label>
+
+        <label>
+          Password
+          <input id="password" type="password" required>
+        </label>
+
+        <button class="btn">เข้าสู่ระบบ</button>
+
+        <div id="msg"></div>
+      </form>
+
+      <hr>
+
+      <small>
+        ทดสอบ: admin/admin123 · kitchen/kitchen123 · packing/packing123
+      </small>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+
+  <script>
+    const presets = {
+      admin: ['admin', 'admin123'],
+      kitchen: ['kitchen', 'kitchen123'],
+      packing: ['packing', 'packing123']
+    };
+
+    preset.onchange = () => {
+      username.value = presets[preset.value][0];
+      password.value = presets[preset.value][1];
+    };
+
+    preset.onchange();
+
+    f.onsubmit = async e => {
+      e.preventDefault();
+
+      msg.textContent = 'กำลังตรวจสอบ...';
+
+      try {
+        const d = await api('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            username: username.value,
+            password: password.value
+          })
+        });
+
+        localStorage.token = d.token;
+        localStorage.user = JSON.stringify(d.user);
+
+        location.href =
+          d.user.role === 'admin'
+            ? '/admin.html'
+            : d.user.role === 'kitchen'
+              ? '/kitchen.html'
+              : '/packing.html';
+
+      } catch (x) {
+        msg.textContent = x.message;
+        msg.className = 'notice';
+      }
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+const express = require('express');
+const { query } = require('../config/db');
+const {
+  auth,
+  allow
+} = require('../middleware/auth');
+
+const r = express.Router();
+
+r.post(
+  '/',
+  async (req, res) =>
+    res
+      .status(201)
+      .json(
+        (
+          await query(
+            `INSERT INTO feedback(
+              user_name,
+              role,
+              rating,
+              category,
+              comment
+            )
+            VALUES($1,$2,$3,$4,$5)
+            RETURNING *`,
+            [
+              req.body.user_name,
+              req.body.role,
+              req.body.rating,
+              req.body.category,
+              req.body.comment
+            ]
+          )
+        ).rows[0]
+      )
+);
+
+r.get(
+  '/',
+  auth,
+  allow('admin'),
+  async (_, res) =>
+    res.json(
+      (
+        await query(
+          'SELECT * FROM feedback ORDER BY created_at DESC'
+        )
+      ).rows
+    )
+);
+
+module.exports = r;

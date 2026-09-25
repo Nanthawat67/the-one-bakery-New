@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kitchen - THE ONE Bakery</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+
+<body>
+  <header class="top">
+    <b>THE ONE Bakery · Production</b>
+
+    <nav>
+      <a href="#" onclick="logout()">ออกจากระบบ</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="notice">
+      หน้านี้ช่วยตอบว่า
+      <b>ต้องผลิตอะไร กี่ชิ้น กี่รอบ และใช้เวลาประมาณเท่าไร</b>
+    </div>
+
+    <section class="card">
+      <h2>Production Plan</h2>
+      <div id="plan"></div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2>งานผลิต</h2>
+      <div id="batches"></div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2>ออเดอร์ในสายการผลิต</h2>
+      <div id="orders"></div>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+
+  <script>
+    requireRole('kitchen');
+
+    async function load() {
+      const p = await api('/production/plan');
+
+      plan.innerHTML = p.length
+        ? `
+          <table class="table">
+            <tr>
+              <th>สินค้า</th>
+              <th>ต้องผลิต</th>
+              <th>ต่อรอบ</th>
+              <th>รอบ</th>
+              <th>เวลา</th>
+              <th>เวลาเริ่มโดยระบบ</th>
+            </tr>
+
+            ${p
+              .map(
+                x =>
+                  `<tr>
+                    <td>${esc(x.name)}</td>
+                    <td>${x.required}</td>
+                    <td>${x.batch_size}</td>
+                    <td>${x.rounds}</td>
+                    <td>${x.estimated_minutes} นาที</td>
+                    <td>
+                      ${new Date(x.recommended_start).toLocaleTimeString('th-TH')}
+                    </td>
+                  </tr>`
+              )
+              .join('')}
+          </table>
+        `
+        : 'ไม่มีงาน';
+
+      const b = await api('/production/batches');
+
+      batches.innerHTML = b.length
+        ? b
+            .map(x => {
+              let pct = Math.round(
+                (x.produced_qty / x.planned_qty) * 100
+              );
+
+              return `
+                <div class="card" style="margin:10px 0">
+                  <b>${esc(x.name)}</b>
+                  · ${x.produced_qty}/${x.planned_qty}
+                  · ${x.status}
+
+                  <div class="progress">
+                    <div style="width:${pct}%"></div>
+                  </div>
+
+                  <div class="row" style="margin-top:8px">
+                    <input
+                      id="b${x.id}"
+                      type="number"
+                      min="0"
+                      max="${x.planned_qty}"
+                      value="${x.produced_qty}"
+                      style="width:100px"
+                    >
+
+                    <button
+                      class="btn"
+                      onclick="saveB(${x.id},${x.planned_qty})"
+                    >
+                      บันทึก
+                    </button>
+                  </div>
+                </div>
+              `;
+            })
+            .join('')
+        : 'ยังไม่มี Batch';
+
+      const o = await api('/orders');
+
+      orders.innerHTML = o
+        .map(
+          x =>
+            `<div class="row">
+              <b>#${x.daily_no || x.id}</b>
+
+              ${x.items
+                .map(i => `${esc(i.name)}×${i.quantity}`)
+                .join(', ')}
+
+              <span class="badge">${x.status}</span>
+
+              ${
+                x.status === 'confirmed'
+                  ? `
+                    <button
+                      class="btn"
+                      onclick="next(${x.id},'in_production')"
+                    >
+                      เริ่มผลิต
+                    </button>
+                  `
+                  : ''
+              }
+
+              ${
+                x.status === 'in_production'
+                  ? `
+                    <button
+                      class="btn success"
+                      onclick="next(${x.id},'ready_for_packing')"
+                    >
+                      ผลิตเสร็จ
+                    </button>
+                  `
+                  : ''
+              }
+            </div>`
+        )
+        .join('');
+    }
+
+    async function saveB(id, max) {
+      let q = Number(
+        document.getElementById('b' + id).value
+      );
+
+      await api('/production/batches/' + id, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          produced_qty: q
+        })
+      });
+
+      load();
+    }
+
+    async function next(id, status) {
+      try {
+        await api('/orders/' + id + '/status', {
+          method: 'POST',
+          body: JSON.stringify({ status })
+        });
+
+        load();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>

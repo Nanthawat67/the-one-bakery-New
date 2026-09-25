@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AI & Analytics</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+
+<body>
+  <header class="top">
+    <b>THE ONE Bakery · AI & Analytics</b>
+
+    <nav>
+      <a href="/admin.html">Admin</a>
+      <a href="/finance.html">การเงิน</a>
+      <a href="#" onclick="logout()">ออกจากระบบ</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="grid">
+      <div class="card">
+        <h3>Sales Forecast</h3>
+        <div id="forecast"></div>
+      </div>
+
+      <div class="card">
+        <h3>Production Recommendation</h3>
+        <div id="rec" class="stat">-</div>
+        <p class="muted">
+          ประมาณการยอดขายเฉลี่ยต่อวันจากข้อมูลล่าสุด
+        </p>
+      </div>
+    </div>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Association Rule</h2>
+      <p class="muted">
+        ใช้ข้อมูลการซื้อร่วมกัน เพื่อช่วยแนะนำสินค้า
+      </p>
+      <div id="assoc"></div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2>สินค้าขายดี</h2>
+      <div id="top"></div>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+
+  <script>
+    requireRole('admin');
+
+    async function load() {
+      const f = await api('/analytics/forecast?days=90');
+
+      const best =
+        f.models.find(x => x.mae !== null) ||
+        f.models[0];
+
+      rec.textContent =
+        Math.round(f.recommendation) + ' ฿/วัน';
+
+      forecast.innerHTML = `
+        <p>
+          โมเดล Baseline:
+          <b>${esc(best.name)}</b>
+        </p>
+
+        <p>
+          MAE: ${best.mae ?? '-'}
+          · RMSE: ${best.rmse ?? '-'}
+        </p>
+
+        <p>
+          Forecast 7 วัน:
+          ${best.next7
+            .map(x => Number(x).toFixed(0))
+            .join(' / ')}
+          บาท
+        </p>
+      `;
+
+      const a = await api('/analytics/association');
+
+      assoc.innerHTML = a.length
+        ? `
+          <table class="table">
+            <tr>
+              <th>สินค้า A</th>
+              <th>สินค้า B</th>
+              <th>Support</th>
+              <th>Confidence</th>
+              <th>Lift</th>
+            </tr>
+
+            ${a
+              .map(
+                x =>
+                  `<tr>
+                    <td>${esc(x.a)}</td>
+                    <td>${esc(x.b)}</td>
+                    <td>${x.support}</td>
+                    <td>${x.confidence_a_to_b}</td>
+                    <td>${x.lift}</td>
+                  </tr>`
+              )
+              .join('')}
+          </table>
+        `
+        : 'ยังมีข้อมูลไม่พอ';
+
+      const s = await api('/analytics/sales?days=90');
+
+      top.innerHTML =
+        s.top
+          .map(
+            x =>
+              `<div class="row">
+                <b>${esc(x.name)}</b>
+                <span>${x.quantity} ชิ้น</span>
+                <span>${x.sales.toFixed(2)} บาท</span>
+              </div>`
+          )
+          .join('') ||
+        'ยังไม่มีข้อมูล';
+    }
+
+    load();
+  </script>
+</body>
+</html>

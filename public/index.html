@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>THE ONE Bakery</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .order-summary{display:grid;gap:12px}
+    .order-item{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #eee1d2}
+    .order-item:last-child{border-bottom:0}
+    .order-item-name{font-weight:700}
+    .order-item-meta{font-size:.9rem;color:#806f63;margin-top:3px}
+    .qty-control{display:flex;align-items:center;gap:6px}
+    .qty-btn{width:34px;height:34px;padding:0;border:0;border-radius:8px;background:#eee1d2;color:#4a3021;font-weight:700}
+    .qty-value{min-width:28px;text-align:center;font-weight:700}
+    .order-total{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:4px;border-top:2px solid #eadbc9;font-size:1.15rem;font-weight:800}
+    .checkout-box{display:grid;gap:14px;margin-top:16px;padding-top:16px;border-top:1px solid #eadbc9}
+    @media(max-width:700px){.order-item{grid-template-columns:1fr auto}.order-item .item-price,.order-item .item-total{justify-self:end}.order-item .qty-control{grid-column:1 / -1}}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <b>THE ONE Bakery</b>
+    <a href="/login.html">จัดการร้าน</a>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>สั่งขนมออนไลน์</h1>
+      <p class="muted">เลือกสินค้า ตรวจสอบรายการและจำนวนให้เรียบร้อย แล้วจึงกรอกข้อมูลสำหรับสั่งซื้อ</p>
+    </section>
+
+    <div id="msg"></div>
+    <div id="products" class="grid"></div>
+
+    <section class="card" style="margin-top:20px">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h2 style="margin:0">รายการที่สั่ง</h2>
+          <div id="cartCount" class="muted" style="margin-top:4px">ยังไม่มีสินค้า</div>
+        </div>
+      </div>
+
+      <div id="cart" class="order-summary" style="margin-top:14px"></div>
+
+      <div id="checkoutBox" class="checkout-box hidden">
+        <h3 style="margin:0">ข้อมูลผู้สั่ง</h3>
+        <form id="checkout" class="form">
+          <input id="customer_name" placeholder="ชื่อผู้สั่ง" required>
+          <input id="phone" placeholder="เบอร์โทร" required>
+          <button class="btn" type="submit">ยืนยันส่งคำขอสั่งซื้อ</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    let ps=[],cart=[];
+
+    const productsEl=document.getElementById('products');
+    const cartEl=document.getElementById('cart');
+    const cartCountEl=document.getElementById('cartCount');
+    const checkoutBox=document.getElementById('checkoutBox');
+    const checkoutForm=document.getElementById('checkout');
+    const msgEl=document.getElementById('msg');
+
+    function money(v){return Number(v).toFixed(2)+' บาท'}
+
+    async function load(){
+      try{
+        ps=await api('/products');
+        productsEl.innerHTML=ps.map(p=>`
+          <div class="card product">
+            <img src="${esc(p.image_url||'')}" alt="${esc(p.name)}" onerror="this.style.display='none'">
+            <h3>${esc(p.name)}</h3>
+            <div class="price">${money(p.price)}</div>
+            <div class="row" style="margin-top:10px">
+              <input id="q${p.id}" type="number" min="1" value="1" style="width:70px">
+              <button class="btn" onclick="add(${p.id})">เพิ่มลงตะกร้า</button>
+            </div>
+          </div>
+        `).join('');
+        render();
+      }catch(e){
+        msgEl.className='notice';
+        msgEl.textContent=e.message||'โหลดสินค้าไม่สำเร็จ';
+      }
+    }
+
+    function add(id){
+      const input=document.getElementById('q'+id);
+      const q=Math.max(1,Number(input.value)||1);
+      const x=cart.find(i=>i.product_id===id);
+      if(x)x.quantity+=q;
+      else cart.push({product_id:id,quantity:q});
+      render();
+    }
+
+    function setQty(index,next){
+      if(next<1){cart.splice(index,1)}
+      else cart[index].quantity=next;
+      render();
+    }
+
+    function removeItem(index){cart.splice(index,1);render()}
+
+    function render(){
+      if(!cart.length){
+        cartCountEl.textContent='ยังไม่มีสินค้า';
+        cartEl.innerHTML='<div class="muted">ยังไม่มีสินค้าในรายการ กรุณาเลือกสินค้าด้านบน</div>';
+        checkoutBox.classList.add('hidden');
+        return;
+      }
+
+      let total=0;
+      let count=0;
+      const rows=cart.map((x,i)=>{
+        const p=ps.find(p=>p.id===x.product_id);
+        const line=Number(p.price)*x.quantity;
+        total+=line;
+        count+=x.quantity;
+        return `
+          <div class="order-item">
+            <div>
+              <div class="order-item-name">${esc(p.name)}</div>
+              <div class="order-item-meta">${money(p.price)} / ชิ้น</div>
+            </div>
+            <div class="qty-control">
+              <button type="button" class="qty-btn" onclick="setQty(${i},${x.quantity-1})">−</button>
+              <span class="qty-value">${x.quantity}</span>
+              <button type="button" class="qty-btn" onclick="setQty(${i},${x.quantity+1})">+</button>
+            </div>
+            <div class="item-price">${money(line)}</div>
+            <button type="button" class="btn secondary" onclick="removeItem(${i})">ลบ</button>
+          </div>`;
+      }).join('');
+
+      cartCountEl.textContent=`${cart.length} รายการ • ${count} ชิ้น`;
+      cartEl.innerHTML=rows+`<div class="order-total"><span>ยอดรวม</span><span>${money(total)}</span></div>`;
+      checkoutBox.classList.remove('hidden');
+    }
+
+    checkoutForm.onsubmit=async e=>{
+      e.preventDefault();
+      if(!cart.length)return;
+      try{
+        const d=await api('/orders',{
+          method:'POST',
+          body:JSON.stringify({
+            customer_name:document.getElementById('customer_name').value.trim(),
+            phone:document.getElementById('phone').value.trim(),
+            items:cart
+          })
+        });
+        msgEl.className='notice';
+        msgEl.innerHTML=`${esc(d.message)}<br><b>หมายเลขออเดอร์ #${d.order_number||d.order_id}</b><br><a href="/track.html?id=${d.order_id}">ดูสถานะและรายการที่สั่ง</a>`;
+        cart=[];
+        checkoutForm.reset();
+        render();
+        window.scrollTo({top:0,behavior:'smooth'});
+      }catch(x){
+        msgEl.className='notice';
+        msgEl.textContent=x.message+(x.details?.length?' : '+x.details.map(a=>`${a.ingredient} ต้องใช้ ${a.need}${a.unit} แต่มี ${a.stock}${a.unit}`).join(', '):'');
+      }
+    };
+
+    load();
+  </script>
+</body>
+</html>
