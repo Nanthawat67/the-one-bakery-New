@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kitchen - THE ONE Bakery</title><link rel="stylesheet" href="/css/app.css"><style>
+.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.flow-step{padding:12px;border:1px solid #eadbc9;border-radius:10px;background:#fff}.flow-step b{display:block;margin-bottom:4px}.kitchen-section{margin-top:16px}.kitchen-card{border-left:5px solid #7a4b31}.kitchen-card.ready{border-left-color:#49744d}.action{margin-top:12px}.empty{padding:18px;border:1px dashed #d8c6b3;border-radius:10px;color:#806f63;background:#fffaf4}.status-note{font-size:.92rem;color:#806f63}.plan-table-wrap{overflow-x:auto}.plan-table{min-width:700px}
+@media(max-width:700px){.flow{grid-template-columns:1fr}.plan-table{min-width:640px}}
+</style></head>
+<body><header class="top"><b>THE ONE Bakery · ฝ่ายผลิต (Kitchen)</b><nav><a href="/admin.html">Admin</a><a href="/packing.html">Packing</a><a href="#" onclick="logout()">ออกจากระบบ</a></nav></header>
+<main class="wrap">
+<div class="notice"><b>ลำดับการทำงาน:</b> 1) Admin ยืนยันออเดอร์ → 2) Kitchen กด “เริ่มผลิต” → 3) ผลิตเสร็จ กด “ผลิตเสร็จ / ส่งให้ Packing” → 4) Packing รับงานต่อ</div>
+<section class="flow"><div class="flow-step"><b>1 · รอเริ่มผลิต</b><span class="muted">ออเดอร์ที่ Admin ยืนยันแล้ว</span></div><div class="flow-step"><b>2 · กำลังผลิต</b><span class="muted">งานที่ Kitchen กำลังทำ</span></div><div class="flow-step"><b>3 · ส่งให้ Packing</b><span class="muted">ผลิตเสร็จแล้ว รอฝ่ายแพ็ก</span></div></section>
+<section class="card kitchen-section"><div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><h2 style="margin:0">แผนการผลิตวันนี้</h2><span class="status-note">รวมจำนวนจากทุกออเดอร์ที่ผ่านการยืนยันแล้ว</span></div><div id="plan" style="margin-top:12px"></div></section>
+<section class="card kitchen-section"><div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><h2 style="margin:0">ยอดรวมที่ต้องผลิต</h2><span class="status-note">ใช้หน้านี้เพื่อดูว่าต้องทำขนมทั้งหมดกี่ชิ้น ไม่ต้องรวมมือ</span></div><div id="productionSummary" style="margin-top:12px"></div></section>
+<section class="card kitchen-section"><h2 style="margin-top:0">งานที่ต้องเริ่มผลิต</h2><div id="confirmed"></div></section>
+<section class="card kitchen-section"><h2 style="margin-top:0">งานที่กำลังผลิต</h2><div id="inProduction"></div></section>
+<section class="card kitchen-section"><h2 style="margin-top:0">ผลิตเสร็จแล้ว · รอ Packing</h2><div id="ready"></div></section>
+<section class="card kitchen-section"><h2 style="margin-top:0">รายละเอียด Batch / จำนวนที่ผลิต</h2><div id="batches"></div></section>
+</main>
+<script src="/js/api.js"></script>
+<script>
+requireRole('kitchen');
+function statusText(s){return {confirmed:'รอเริ่มผลิต',in_production:'กำลังผลิต',ready_for_packing:'รอ Packing'}[s]||s}
+function orderCard(x,action){const items=Array.isArray(x.items)?x.items:[];return `<div class="card kitchen-card ${x.status==='ready_for_packing'?'ready':''}" style="margin:10px 0"><div class="row" style="justify-content:space-between"><b>#${x.daily_no||x.id} · ${esc(x.customer_name||'ลูกค้า')}</b><span class="badge">${statusText(x.status)}</span></div><div style="margin-top:8px">${items.map(i=>`${esc(i.name)} × ${i.quantity}`).join('<br>')}</div><div class="action">${action}</div></div>`}
+async function load(){
+  try{
+    const p=await api('/production/plan');
+    plan.innerHTML=p.length?`<div class="plan-table-wrap"><table class="table plan-table"><thead><tr><th>สินค้า</th><th>ต้องผลิต</th><th>ต่อรอบ</th><th>จำนวนรอบ</th><th>เวลาประมาณ</th></tr></thead><tbody>${p.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${x.required} ชิ้น</td><td>${x.batch_size}</td><td>${x.rounds} รอบ</td><td>${x.estimated_minutes} นาที</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีออเดอร์ที่ต้องผลิต</div>';
+    const os=await api('/orders');
+    const c=os.filter(x=>x.status==='confirmed'), ip=os.filter(x=>x.status==='in_production'), rd=os.filter(x=>x.status==='ready_for_packing');
+    const activeForProduction=[...c,...ip];
+    const grouped={};
+    activeForProduction.forEach(o=>{(o.items||[]).forEach(i=>{
+      const k=String(i.product_id||i.name);
+      if(!grouped[k]) grouped[k]={product_id:i.product_id,name:i.name,quantity:0,orders:[]};
+      grouped[k].quantity+=Number(i.quantity)||0;
+      grouped[k].orders.push(`#${o.daily_no||o.id}`);
+    });});
+    const summaryRows=Object.values(grouped);
+    productionSummary.innerHTML=summaryRows.length
+      ? `<div class="plan-table-wrap"><table class="table plan-table"><thead><tr><th>สินค้า</th><th>รวมที่ต้องผลิต</th><th>มาจากออเดอร์</th></tr></thead><tbody>${summaryRows.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td><b>${x.quantity} ชิ้น</b></td><td>${esc(x.orders.join(', '))}</td></tr>`).join('')}</tbody></table></div>`
+      : '<div class="empty">ยังไม่มีออเดอร์ที่อยู่ในขั้นตอนการผลิต</div>';
+    confirmed.innerHTML=c.length?c.map(x=>orderCard(x,`<button class="btn" onclick="next(${x.id},'in_production')">▶ เริ่มผลิต</button>`)).join(''):'<div class="empty">ตอนนี้ไม่มีออเดอร์ที่รอเริ่มผลิต<br><span class="status-note">ถ้า Admin ยังไม่ยืนยันออเดอร์ งานจะยังไม่เข้าขั้นตอนนี้</span></div>';
+    inProduction.innerHTML=ip.length?ip.map(x=>orderCard(x,`<button class="btn success" onclick="next(${x.id},'ready_for_packing')">✓ ผลิตเสร็จ / ส่งให้ Packing</button>`)).join(''):'<div class="empty">ไม่มีงานที่กำลังผลิต</div>';
+    ready.innerHTML=rd.length?rd.map(x=>orderCard(x,'<span class="status-note">ส่งต่อให้ฝ่าย Packing แล้ว • Kitchen ไม่ต้องกดต่อ</span>')).join(''):'<div class="empty">ยังไม่มีงานที่ส่งให้ Packing<br><span class="status-note">เมื่อกด “ผลิตเสร็จ / ส่งให้ Packing” งานจะมาปรากฏที่หน้านี้และหน้า Packing</span></div>';
+    const b=await api('/production/batches');
+    batches.innerHTML=b.length?b.map(x=>{const pct=x.planned_qty?Math.min(100,Math.round(x.produced_qty/x.planned_qty*100)):0;return `<div class="card" style="margin:10px 0"><div class="row" style="justify-content:space-between"><b>${esc(x.name)}</b><span class="badge">${esc(x.status)}</span></div><div style="margin-top:7px">ผลิตแล้ว ${x.produced_qty}/${x.planned_qty} ชิ้น</div><div class="progress" style="margin-top:7px"><div style="width:${pct}%"></div></div><div class="row" style="margin-top:8px"><input id="b${x.id}" type="number" min="0" max="${x.planned_qty}" value="${x.produced_qty}" style="width:110px;padding:8px;border:1px solid #d8c6b3;border-radius:8px"><button class="btn secondary" onclick="saveB(${x.id},${x.planned_qty})">บันทึกจำนวนผลิต</button></div></div>`}).join(''):'<div class="empty">ยังไม่มี Batch ที่สร้างโดยระบบ</div>';
+  }catch(e){confirmed.innerHTML=inProduction.innerHTML=ready.innerHTML=`<div class="error-box">โหลดงาน Kitchen ไม่สำเร็จ: ${esc(e.message)}</div>`}
+}
+async function saveB(id,max){const q=Number(document.getElementById('b'+id).value);if(!(q>=0&&q<=max))return alert('จำนวนผลิตไม่ถูกต้อง');try{await api('/production/batches/'+id,{method:'PATCH',body:JSON.stringify({produced_qty:q})});load()}catch(e){alert(e.message)}}
+async function next(id,status){try{await api('/orders/'+id+'/status',{method:'POST',body:JSON.stringify({status})});await load()}catch(e){alert(e.message)}}
+load();setInterval(load,5000);
+</script></body></html>

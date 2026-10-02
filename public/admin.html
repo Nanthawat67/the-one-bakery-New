@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin - THE ONE Bakery</title><link rel="stylesheet" href="/css/app.css"><style>
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tab{border:1px solid #d8c4b0;background:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}.tab.active{background:#6b4f3a;color:#fff}.panel{display:none}.panel.active{display:block}.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.form-grid input,.form-grid select{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px}.item-row{display:grid;grid-template-columns:1.4fr .7fr .7fr auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid #eee}.muted2{color:#777;font-size:13px}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#f1e7dd;font-size:12px}.danger2{background:#b44;color:#fff}.small{padding:7px 10px}.product-thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;background:#eee1d2;margin-right:10px}.error-box{padding:10px;border-radius:8px;background:#fff0f0;color:#8b2222}.order-actions{margin-top:10px;padding-top:10px;border-top:1px solid #eee}.order-status-label{font-weight:700}.order-date-label{white-space:nowrap}
+</style></head><body><header class="top"><b>THE ONE Bakery · Admin</b><nav><a href="/admin.html">ออเดอร์</a><a href="#" onclick="showPanel('products',this);return false">สินค้า / วัตถุดิบ</a><a href="/analytics.html">AI & Analytics</a><a href="/finance.html">การเงิน</a><a href="#" onclick="logout()">ออกจากระบบ</a></nav></header>
+<main class="wrap">
+<div class="grid"><div class="card"><div class="muted">ออเดอร์รอตรวจสอบ</div><div id="pending" class="stat">0</div></div><div class="card"><div class="muted">ยอดขายวันนี้</div><div id="sales" class="stat">0</div></div><div class="card"><div class="muted">แจ้งเตือนยังไม่อ่าน</div><div id="unread" class="stat">0</div></div></div>
+<div class="tabs" style="margin-top:16px"><button class="tab active" onclick="showPanel('orders',this)">ออเดอร์</button><button class="tab" onclick="showPanel('products',this)">สินค้า / เมนู</button><button class="tab" onclick="showPanel('inventory',this)">วัตถุดิบ / Stock</button></div>
+<section id="panel-orders" class="panel active"><section class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">ออเดอร์ที่ต้องตรวจสอบ</h2><div class="row"><label class="muted2">วันที่ <input id="orderDate" type="date" onchange="selectOrderDate()"></label><button class="btn secondary small" onclick="showAllOrders()">ดูทั้งหมด</button></div></div><div id="orders" style="margin-top:14px"></div></section><section class="card" style="margin-top:16px"><h2>แจ้งเตือน</h2><div id="notes"></div></section></section>
+<section id="panel-products" class="panel"><section class="card"><h2>จัดการเมนูสินค้า</h2><div class="form-grid"><input id="pname" placeholder="ชื่อสินค้า"><input id="pprice" type="number" step="0.01" placeholder="ราคา"><input id="pimg" type="file" accept="image/*" onchange="previewProductImage()"><button class="btn success" onclick="saveProduct()">เพิ่มสินค้า</button></div><div class="muted2" style="margin-top:8px">เลือกรูปจากเครื่องได้โดยตรง ระบบจะปรับภาพเป็นรูปสี่เหลี่ยมและบันทึกให้เหมาะกับเว็บอัตโนมัติ</div><img id="pimgPreview" class="hidden" alt="ตัวอย่างรูปสินค้า" style="width:180px;height:120px;object-fit:cover;border-radius:10px;margin-top:10px"><div id="productsList" style="margin-top:14px"></div></section><section class="card" style="margin-top:16px"><h2>สูตรวัตถุดิบของสินค้า</h2><div class="muted2">เลือกสินค้า แล้วกำหนดวัตถุดิบที่ใช้ต่อ 1 ชิ้น</div><div class="form-grid" style="margin-top:10px"><select id="recipeProduct" onchange="loadRecipe()"></select><select id="recipeIngredient"></select><input id="recipeQty" type="number" step="0.001" placeholder="ใช้ต่อ 1 ชิ้น"><button class="btn" onclick="saveRecipe()">เพิ่ม / แก้สูตร</button></div><div id="recipeList" style="margin-top:14px"></div></section></section>
+<section id="panel-inventory" class="panel"><section class="card"><h2>จัดการวัตถุดิบ / Stock</h2><div class="form-grid"><input id="iname" placeholder="ชื่อวัตถุดิบ"><input id="iunit" placeholder="หน่วย เช่น กรัม"><input id="istock" type="number" step="0.001" placeholder="Stock"><input id="ireorder" type="number" step="0.001" placeholder="จุดสั่งซื้อ"><button class="btn success" onclick="addIngredient()">เพิ่มวัตถุดิบ</button></div><div id="inventoryList" style="margin-top:14px"></div></section><section class="card" style="margin-top:16px"><div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><h2 style="margin:0">ประวัติการตัด Stock</h2><button class="btn secondary small" onclick="loadInventoryMovements()">รีเฟรช</button></div><div class="muted2" style="margin-top:6px">ระบบตัดวัตถุดิบเมื่อ Kitchen กด “ผลิตเสร็จ / ส่งให้ Packing” และบันทึกไว้เพื่อการตรวจสอบย้อนหลัง</div><div id="inventoryMovements" style="margin-top:14px"></div></section></section>
+</main><script src="/js/api.js"></script><script>
+const u=requireRole('admin'); if(!u) throw new Error('redirect');
+let productsCache=[]; let inventoryCache=[]; let showAllOrderDates=false;
+function localDateString(d=new Date()){const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,10)}
+orderDate.value=localDateString();
+function showAllOrders(){showAllOrderDates=true;loadOrders()}
+function selectOrderDate(){showAllOrderDates=false;loadOrders()}
+
+function showPanel(name,el){document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));document.getElementById('panel-'+name).classList.add('active');document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));if(el)el.classList.add('active');if(name==='products'){loadProducts();loadInventory();loadRecipeSelectors()}if(name==='inventory'){loadInventory();loadInventoryMovements()}}
+function normalizeStatus(s){const map={'รอตรวจสอบ':'pending_review','ยืนยันออเดอร์':'confirmed','กำลังผลิต':'in_production','รอแพ็ก':'ready_for_packing','แพ็กเสร็จ':'packed','ลูกค้ารับสินค้าแล้ว':'picked_up','ปฏิเสธออเดอร์':'rejected','ปฏิเสธ':'rejected','ยกเลิก':'cancelled'};const v=String(s??'').trim();return map[v]||v}
+function statusLabel(s){const map={pending_review:'รอตรวจสอบ',confirmed:'ยืนยันออเดอร์',in_production:'กำลังผลิต',ready_for_packing:'รอแพ็ก',packed:'แพ็กเสร็จ',picked_up:'ลูกค้ารับสินค้าแล้ว',rejected:'ปฏิเสธออเดอร์',cancelled:'ยกเลิก'};return map[s]||s}
+function prettyOrderDate(v){const t=String(v??'');return /^\d{4}-\d{2}-\d{2}/.test(t)?t.slice(0,10):t}
+async function loadOrders(){
+  try{
+    const dateParam=showAllOrderDates?'':'?date='+encodeURIComponent(orderDate.value||localDateString());
+    const os=await api('/orders'+dateParam);
+    pending.textContent=os.filter(x=>normalizeStatus(x.status)==='pending_review').length;
+    orders.innerHTML=os.length?os.map(o=>{const st=normalizeStatus(o.status);const items=Array.isArray(o.items)?o.items:[];return `<div class="card" style="margin:10px 0"><div class="row" style="justify-content:space-between"><b>#${o.daily_no||o.id} <span class="muted2 order-date-label">(${prettyOrderDate(o.order_date)})</span> ${esc(o.customer_name)}</b><span class="badge order-status-label">${esc(statusLabel(st))}</span></div><p>${items.map(i=>`${esc(i.name)} × ${i.quantity}`).join(', ')}</p>${st==='pending_review'?`<div class="row order-actions"><button type="button" class="btn success" onclick="decide(${o.id},'accept')">✓ รับออเดอร์ / ยืนยัน</button><button type="button" class="btn danger" onclick="decide(${o.id},'reject')">✕ ปฏิเสธ</button></div>`:''}<small>ยอด ${Number(o.total_price).toFixed(2)} บาท</small></div>`}).join(''):'ไม่มีออเดอร์ในวันที่เลือก';
+  }catch(e){orders.innerHTML=`<div class="error-box">โหลดออเดอร์ไม่สำเร็จ: ${esc(e.message)}</div>`;}
+  try{
+    const n=await api('/notifications');
+    unread.textContent=n.filter(x=>!x.read_at).length;
+    notes.innerHTML=n.length?n.map(x=>`<div class="row"><span class="badge">${x.read_at?'อ่านแล้ว':'ใหม่'}</span><b>${esc(x.title)}</b><span>${esc(x.message)}</span>${!x.read_at?`<button class="btn secondary" onclick="readN(${x.id})">อ่าน</button>`:''}</div>`).join(''):'<div class="muted">ไม่มีแจ้งเตือน</div>';
+  }catch(e){unread.textContent='-';notes.innerHTML=`<div class="error-box">โหลดแจ้งเตือนไม่สำเร็จ: ${esc(e.message)}</div>`;}
+  try{const f=await api('/finance?date='+localDateString());sales.textContent=Number(f.sales).toFixed(2)+' ฿';}catch(e){sales.textContent='-';}
+}
+async function decide(id,decision){let reason='';if(decision==='reject')reason=prompt('เหตุผลที่ปฏิเสธ')||'ไม่สามารถรับออเดอร์ได้';if(decision==='accept'&&!confirm('ยืนยันรับออเดอร์นี้และส่งต่อให้ฝ่าย Kitchen หรือไม่?'))return;try{await api('/orders/'+id+'/decision',{method:'POST',body:JSON.stringify({decision,reason})});await loadOrders();alert(decision==='accept'?'ยืนยันออเดอร์แล้ว ฝ่าย Kitchen สามารถทำงานต่อได้':'ปฏิเสธออเดอร์แล้ว')}catch(e){alert(e.message)}}async function readN(id){await api('/notifications/'+id+'/read',{method:'PATCH'});loadOrders()}
+async function loadProducts(){
+  try{
+    productsCache=await api('/products/admin/all');
+    recipeProduct.innerHTML=productsCache.map(p=>`<option value="${p.id}">${esc(p.name)}${p.active?'':' (ปิดขาย)'}</option>`).join('');
+    productsList.innerHTML=productsCache.length?productsCache.map(p=>`<div class="item-row"><div class="row" style="align-items:center"><img class="product-thumb" src="${esc(p.image_url||'')}" alt="" onerror="this.style.display='none'"><div><b>${esc(p.name)}</b><div class="muted2">${p.image_url?'มีรูปสินค้า':'ไม่มีรูป'} · <span class="pill">${p.active?'เปิดขาย':'ปิดขาย'}</span></div></div></div><div>${Number(p.price).toFixed(2)} ฿</div><div></div><div><button class="btn small" onclick="editProduct(${p.id})">แก้ไข</button> <button class="btn small ${p.active?'danger2':''}" onclick="toggleProduct(${p.id},${!p.active})">${p.active?'ปิดขาย':'เปิดขาย'}</button></div></div>`).join(''):'<div class="muted">ยังไม่มีสินค้า</div>';
+    await loadRecipeSelectors(); loadRecipe();
+  }catch(e){productsList.innerHTML=`<div class="error-box">โหลดสินค้าไม่สำเร็จ: ${esc(e.message)}<br>ลองออกจากระบบแล้วเข้าสู่ระบบ Admin ใหม่</div>`;}
+}
+async function fileToImageData(file){
+  if(!file)return null;
+  if(!file.type.startsWith('image/'))throw new Error('กรุณาเลือกไฟล์รูปภาพ');
+  const src=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(new Error('อ่านรูปภาพไม่สำเร็จ'));r.readAsDataURL(file)});
+  const img=await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(new Error('เปิดรูปภาพไม่สำเร็จ'));im.src=src});
+  const size=Math.min(img.naturalWidth,img.naturalHeight);
+  const sx=(img.naturalWidth-size)/2,sy=(img.naturalHeight-size)/2;
+  const max=700;
+  const canvas=document.createElement('canvas');canvas.width=max;canvas.height=max;
+  canvas.getContext('2d').drawImage(img,sx,sy,size,size,0,0,max,max);
+  return canvas.toDataURL('image/jpeg',0.82);
+}
+async function previewProductImage(){
+  const file=pimg.files[0],preview=document.getElementById('pimgPreview');
+  if(!file){preview.classList.add('hidden');return}
+  try{preview.src=await fileToImageData(file);preview.classList.remove('hidden')}catch(e){preview.classList.add('hidden');alert(e.message)}
+}
+async function saveProduct(){
+  const name=pname.value.trim(),price=Number(pprice.value);
+  if(!name||!(price>=0))return alert('กรอกชื่อและราคาให้ถูกต้อง');
+  try{const image_url=pimg.files[0]?await fileToImageData(pimg.files[0]):null;await api('/products',{method:'POST',body:JSON.stringify({name,price,image_url})});pname.value='';pprice.value='';pimg.value='';document.getElementById('pimgPreview').classList.add('hidden');await loadProducts()}catch(e){alert(e.message)}}
+async function editProduct(id){
+  const p=productsCache.find(x=>x.id===id);if(!p)return alert('ไม่พบสินค้า');
+  const nn=prompt('ชื่อสินค้า',p.name);if(nn===null)return;
+  const pp=prompt('ราคา',p.price);if(pp===null)return;
+  const changeImage=confirm('ต้องการเปลี่ยนรูปสินค้าหรือไม่?');
+  let image_url;
+  if(changeImage){
+    const input=document.createElement('input');input.type='file';input.accept='image/*';
+    input.onchange=async()=>{try{if(!input.files[0])return;image_url=await fileToImageData(input.files[0]);await api('/products/'+id,{method:'PUT',body:JSON.stringify({name:nn,price:Number(pp),image_url,active:p.active})});await loadProducts()}catch(e){alert(e.message)}};input.click();return;
+  }
+  try{await api('/products/'+id,{method:'PUT',body:JSON.stringify({name:nn,price:Number(pp),active:p.active})});await loadProducts()}catch(e){alert(e.message)}
+}
+
+async function toggleProduct(id,active){try{await api('/products/'+id,{method:'PUT',body:JSON.stringify({active})});await loadProducts()}catch(e){alert(e.message)}}
+async function loadInventory(){inventoryCache=await api('/inventory');inventoryList.innerHTML=inventoryCache.map(i=>`<div class="item-row"><div><b>${esc(i.name)}</b><div class="muted2">${esc(i.unit)}</div></div><div>Stock: ${Number(i.stock)}</div><div>จุดสั่งซื้อ: ${Number(i.reorder_level)}</div><div><button class="btn small" onclick="editIngredient(${i.id})">แก้ไข</button></div></div>`).join('')}
+async function loadInventoryMovements(){try{const rows=await api('/inventory/movements?limit=50');inventoryMovements.innerHTML=rows.length?rows.map(m=>`<div class="item-row"><div><b>${esc(m.ingredient)}</b><div class="muted2">ออเดอร์ #${esc(m.order_id??'-')} · ${esc(m.display_name||'ระบบ')}</div></div><div>- ${Number(m.quantity)} ${esc(m.unit)}</div><div>${esc(String(m.created_at||'').replace('T',' ').slice(0,19))}</div><div class="muted2">${esc(m.note||'ใช้ในการผลิต')}</div></div>`).join(''):'<div class="empty">ยังไม่มีประวัติการตัด Stock</div>'}catch(e){inventoryMovements.innerHTML=`<div class="error-box">โหลดประวัติไม่สำเร็จ: ${esc(e.message)}</div>`}}
+async function addIngredient(){const name=iname.value.trim(),unit=iunit.value.trim();if(!name||!unit)return alert('กรอกชื่อและหน่วย');await api('/inventory',{method:'POST',body:JSON.stringify({name,unit,stock:Number(istock.value||0),reorder_level:Number(ireorder.value||0)})});iname.value=iunit.value=istock.value=ireorder.value='';loadInventory();loadRecipeSelectors()}
+async function editIngredient(id){const i=inventoryCache.find(x=>x.id===id);if(!i)return alert('ไม่พบวัตถุดิบ');const n=prompt('ชื่อวัตถุดิบ',i.name);if(n===null)return;const u=prompt('หน่วย',i.unit);if(u===null)return;const s=prompt('Stock',i.stock);if(s===null)return;const r=prompt('จุดสั่งซื้อ',i.reorder_level);if(r===null)return;try{await api('/inventory/'+id,{method:'PATCH',body:JSON.stringify({name:n,unit:u,stock:Number(s),reorder_level:Number(r)})});await loadInventory();await loadRecipeSelectors();await loadRecipe()}catch(e){alert(e.message)}}
+async function loadRecipeSelectors(){const ps=await api('/products/admin/all');const xs=await api('/inventory');recipeProduct.innerHTML=ps.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');recipeIngredient.innerHTML=xs.map(i=>`<option value="${i.id}">${esc(i.name)} (${esc(i.unit)})</option>`).join('')}
+async function loadRecipe(){if(!recipeProduct.value)return;const rs=await api('/inventory/recipes/'+recipeProduct.value);recipeList.innerHTML=rs.length?rs.map(r=>`<div class="item-row"><div><b>${esc(r.name)}</b><div class="muted2">Stock ปัจจุบัน ${Number(r.stock)} ${esc(r.unit)}</div></div><div>ใช้/ชิ้น: ${Number(r.quantity)} ${esc(r.unit)}</div><div></div><div><button class="btn small danger2" onclick="deleteRecipe(${r.product_id},${r.ingredient_id})">ลบ</button></div></div>`).join(''):'ยังไม่มีการกำหนดวัตถุดิบสำหรับสินค้านี้' }
+async function saveRecipe(){if(!recipeProduct.value||!recipeIngredient.value||!(Number(recipeQty.value)>0))return alert('เลือกสินค้า วัตถุดิบ และระบุปริมาณ');await api('/inventory/recipes',{method:'POST',body:JSON.stringify({product_id:Number(recipeProduct.value),ingredient_id:Number(recipeIngredient.value),quantity:Number(recipeQty.value)})});recipeQty.value='';loadRecipe()}
+async function deleteRecipe(pid,iid){await api('/inventory/recipes/'+pid+'/'+iid,{method:'DELETE'});loadRecipe()}
+loadOrders().catch(e=>{orders.innerHTML=`<div class="error-box">โหลดออเดอร์ไม่สำเร็จ: ${esc(e.message)}</div>`}); loadProducts(); loadInventory(); loadInventoryMovements(); setInterval(()=>loadOrders().catch(()=>{}),5000);
+</script></body></html>

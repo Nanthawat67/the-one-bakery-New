@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ตะกร้าสินค้า · THE ONE Bakery</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .order-summary{display:grid;gap:12px}.order-item{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #eee1d2}.order-item:last-child{border-bottom:0}.order-item-name{font-weight:700}.order-item-meta{font-size:.9rem;color:#806f63;margin-top:3px}.qty-control{display:flex;align-items:center;gap:6px}.qty-btn{width:34px;height:34px;padding:0;border:0;border-radius:8px;background:#eee1d2;color:#4a3021;font-weight:700}.qty-value{min-width:28px;text-align:center;font-weight:700}.order-total{display:flex;justify-content:space-between;padding-top:12px;margin-top:4px;border-top:2px solid #eadbc9;font-size:1.15rem;font-weight:800}.actions{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px}.summary-image{width:70px;height:55px;object-fit:cover;border-radius:8px;background:#eadbc9}.item-main{display:flex;align-items:center;gap:10px}@media(max-width:700px){.order-item{grid-template-columns:1fr auto}.order-item .item-price,.order-item .item-total{justify-self:end}.order-item .qty-control{grid-column:1 / -1}.actions{flex-direction:column}.actions a,.actions button{width:100%;text-align:center}}
+  </style>
+</head>
+<body>
+<header class="top"><b>THE ONE Bakery · ตะกร้า</b><nav><a href="/">เลือกสินค้า</a><a href="/login.html">จัดการร้าน</a></nav></header>
+<main class="wrap">
+  <section class="hero"><h1>ตรวจสอบตะกร้า</h1><p class="muted">ตรวจสอบสินค้าและจำนวนให้เรียบร้อยก่อนกรอกข้อมูลผู้สั่งซื้อ</p></section>
+  <div id="msg"></div><div id="capacityContact" class="card hidden" style="margin-top:16px"></div>
+  <section class="card">
+    <div id="cart" class="order-summary"></div>
+    <div id="empty" class="muted hidden">ยังไม่มีสินค้าในตะกร้า</div>
+    <div class="actions"><a class="btn secondary" href="/">← เลือกสินค้าเพิ่ม</a><button id="clearBtn" class="btn danger" type="button">ล้างตะกร้า</button></div>
+  </section>
+
+  <section id="checkoutBox" class="card hidden" style="margin-top:16px">
+    <h2 style="margin-top:0">ข้อมูลผู้สั่งซื้อ</h2>
+    <p class="muted">กรอกข้อมูลสำหรับติดต่อและตรวจสอบออเดอร์</p>
+    <form id="checkout" class="form">
+      <label>ชื่อผู้สั่ง<input id="customer_name" maxlength="120" placeholder="ชื่อผู้สั่ง" required></label>
+      <label>เบอร์โทร<input id="phone" maxlength="40" inputmode="tel" placeholder="เบอร์โทร" required></label>
+      <button class="btn" type="submit">ยืนยันส่งคำขอสั่งซื้อ</button>
+    </form>
+  </section>
+</main>
+<script src="/js/api.js"></script>
+<script>
+let products=[];
+const cartEl=document.getElementById('cart'),emptyEl=document.getElementById('empty'),checkoutBox=document.getElementById('checkoutBox'),form=document.getElementById('checkout'),msg=document.getElementById('msg');
+function getCart(){try{return JSON.parse(localStorage.getItem('the_one_cart')||'[]')}catch{return []}}
+function saveCart(c){localStorage.setItem('the_one_cart',JSON.stringify(c));render()}
+function money(v){return Number(v).toFixed(2)+' บาท'}
+function setQty(i,q){const c=getCart();if(q<1)c.splice(i,1);else c[i].quantity=Math.floor(q);saveCart(c)}
+function removeItem(i){const c=getCart();c.splice(i,1);saveCart(c)}
+function render(){
+  const c=getCart().filter(x=>products.some(p=>Number(p.id)===Number(x.product_id)));
+  if(c.length!==getCart().length)localStorage.setItem('the_one_cart',JSON.stringify(c));
+  if(!c.length){cartEl.innerHTML='';emptyEl.classList.remove('hidden');checkoutBox.classList.add('hidden');return}
+  emptyEl.classList.add('hidden');let total=0,count=0;
+  cartEl.innerHTML=c.map((x,i)=>{const p=products.find(p=>Number(p.id)===Number(x.product_id));const q=Math.max(1,Number(x.quantity)||1);const line=Number(p.price)*q;total+=line;count+=q;return `<div class="order-item"><div class="item-main"><img class="summary-image" src="${esc(p.image_url||'')}" alt="" onerror="this.style.display='none'"><div><div class="order-item-name">${esc(p.name)}</div><div class="order-item-meta">${money(p.price)} / ชิ้น</div></div></div><div class="qty-control"><button type="button" class="qty-btn" onclick="setQty(${i},${q-1})">−</button><span class="qty-value">${q}</span><button type="button" class="qty-btn" onclick="setQty(${i},${q+1})">+</button></div><div class="item-total">${money(line)}</div><button type="button" class="btn secondary" onclick="removeItem(${i})">ลบ</button></div>`}).join('')+`<div class="order-total"><span>รวม ${count} ชิ้น</span><span>${money(total)}</span></div>`;
+  checkoutBox.classList.remove('hidden');
+}
+document.getElementById('clearBtn').onclick=()=>{if(getCart().length&&!confirm('ต้องการล้างตะกร้าหรือไม่?'))return;localStorage.removeItem('the_one_cart');render()};
+async function loadShopInfo(){try{return await api('/shop-info')}catch{return {shop_name:'THE ONE Bakery',phone:'',line_url:''}}}
+function showCapacityContact(data){
+  const box=document.getElementById('capacityContact');
+  const cap=data?.capacity;
+  const summary=cap?`${cap.product} × ${cap.requested} ชิ้น`:'สินค้าที่ต้องการสั่งจำนวนมาก';
+  box.classList.remove('hidden');
+  box.innerHTML=`<h3 style="margin-top:0">ต้องการสั่งเกินกำลังการผลิต?</h3>
+    <p class="muted">${esc(data?.error||'สินค้ารายการนี้เกินกำลังการผลิตที่ระบบกำหนด')}<br>ไม่จำเป็นต้องเปลี่ยนร้านครับ สามารถฝากข้อมูลไว้ให้เจ้าของร้านตรวจสอบและติดต่อกลับได้</p>
+    ${cap?`<div class="notice">${esc(cap.product)} · ต้องการ ${cap.requested} ชิ้น · ระบบรับได้ประมาณ ${Math.max(0,cap.limit-cap.queued)} ชิ้นในขณะนี้</div>`:''}
+    <form id="capacityContactForm" class="form" style="margin-top:12px">
+      <input id="contactName" maxlength="120" placeholder="ชื่อ" value="${esc(document.getElementById('customer_name').value.trim())}" required>
+      <input id="contactPhone" maxlength="40" inputmode="tel" placeholder="เบอร์โทร" value="${esc(document.getElementById('phone').value.trim())}" required>
+      <textarea id="contactMessage" rows="4" placeholder="เช่น ต้องการ 100 ชิ้น วันที่..." required>ต้องการ ${summary} รบกวนสอบถามเจ้าของร้านว่าสามารถจัดเตรียมให้ได้หรือไม่</textarea>
+      <button class="btn" type="submit">ส่งคำขอให้เจ้าของร้านติดต่อกลับ</button>
+    </form>`;
+  document.getElementById('capacityContactForm').onsubmit=async e=>{
+    e.preventDefault();
+    const btn=e.submitter; btn.disabled=true;
+    try{
+      const d=await api('/orders/capacity-contact',{method:'POST',body:JSON.stringify({customer_name:contactName.value.trim(),phone:contactPhone.value.trim(),message:contactMessage.value.trim(),product_summary:summary})});
+      box.innerHTML=`<div class="notice"><b>${esc(d.message||'ส่งคำขอแล้ว')}</b><br>เก็บเบอร์ ${esc(contactPhone.value.trim())} ไว้เพื่อให้ร้านติดต่อกลับได้</div><div class="actions"><a class="btn secondary" href="/">← กลับหน้าเลือกสินค้า</a><a class="btn secondary" href="/track.html">ติดตามออเดอร์</a></div>`;
+    }catch(err){alert(err.message);btn.disabled=false}
+  };
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+}
+form.onsubmit=async e=>{
+  e.preventDefault();
+  const items=getCart(); if(!items.length)return;
+  msg.className=''; msg.innerHTML=''; document.getElementById('capacityContact').classList.add('hidden');
+  try{
+    const d=await api('/orders',{method:'POST',body:JSON.stringify({customer_name:document.getElementById('customer_name').value.trim(),phone:document.getElementById('phone').value.trim(),items})});
+    localStorage.removeItem('the_one_cart');
+    const orderNo=d.order_number||d.order_id;
+    localStorage.setItem('the_one_last_order',JSON.stringify({order_id:d.order_id,order_number:orderNo,order_date:new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Bangkok'})}));
+    msg.className='card notice';
+    msg.innerHTML=`<h3 style="margin-top:0">สั่งซื้อสำเร็จ</h3><p>${esc(d.message||'ร้านได้รับคำขอสั่งซื้อแล้ว')}</p><p><b>หมายเลขออเดอร์ #${esc(orderNo)}</b></p><div class="actions"><a class="btn" href="/track.html?id=${encodeURIComponent(d.order_id)}">ติดตามออเดอร์ #${esc(orderNo)}</a><a class="btn secondary" href="/">← กลับหน้าเลือกสินค้า</a></div>`;
+    form.reset(); render(); window.scrollTo({top:0,behavior:'smooth'});
+  }catch(x){
+    if(x.message&&/กำลังการผลิต/.test(x.message)){showCapacityContact({error:x.message,capacity:x.capacity});return;}
+    msg.className='notice'; msg.textContent=x.message+(x.details?.length?' : '+x.details.map(a=>`${a.ingredient} ต้องใช้ ${a.need}${a.unit} แต่มี ${a.stock}${a.unit}`).join(', '):'');
+  }
+}
+(async()=>{try{products=await api('/products');render()}catch(e){msg.className='notice';msg.textContent=e.message}})();
+</script>
+</body>
+</html>

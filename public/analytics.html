@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="th">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI & Analytics</title><link rel="stylesheet" href="/css/app.css"><style>
+.metric{font-size:1.55rem;font-weight:800;overflow-wrap:anywhere}.sub{font-size:.9rem;color:#806f63;overflow-wrap:anywhere}.analytics-card{min-width:0;overflow:hidden}.analytics-grid{min-width:0}.forecast-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px;min-width:0}.forecast-day{padding:10px;border:1px solid #eadbc9;border-radius:10px;text-align:center;min-width:0;overflow:hidden}.forecast-day b{display:block;margin-top:5px;overflow-wrap:anywhere}.table-wrap{max-width:100%;overflow-x:auto}.table-wrap .table{min-width:620px}.empty-state{padding:14px;border:1px dashed #d8c4b0;border-radius:10px;color:#806f63;overflow-wrap:anywhere}.mini-list{display:grid;gap:8px;min-width:0}.mini-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #eee;min-width:0}.mini-row>span{min-width:0;overflow-wrap:anywhere}.mini-row:last-child{border-bottom:0}@media(max-width:900px){.forecast-list{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:600px){.forecast-list{grid-template-columns:repeat(2,minmax(0,1fr))}.mini-row{align-items:flex-start;flex-direction:column;gap:4px}}
+</style></head>
+<body><header class="top"><b>THE ONE Bakery · AI & Analytics</b><nav><a href="/admin.html">Admin</a><a href="/finance.html">การเงิน</a><a href="#" onclick="logout()">ออกจากระบบ</a></nav></header>
+<main class="wrap"><div id="msg"></div>
+<div class="grid analytics-grid"><div class="card analytics-card"><h3>Sales Forecast</h3><div id="forecast"><div class="empty-state">กำลังโหลดข้อมูล...</div></div></div><div class="card analytics-card"><h3>Production Recommendation</h3><div id="rec"><div class="empty-state">กำลังโหลดข้อมูล...</div></div><p class="muted">แนะนำจำนวนผลิตต่อวันจากค่าเฉลี่ยยอดขายสินค้าในข้อมูลย้อนหลัง</p></div></div>
+<section class="card analytics-card" style="margin-top:16px"><h2>Association Rule</h2><p class="muted">วิเคราะห์สินค้าที่มักถูกสั่งร่วมกันจากออเดอร์จริง</p><div id="assoc"><div class="empty-state">กำลังโหลดข้อมูล...</div></div></section>
+<section class="card analytics-card" style="margin-top:16px"><h2>สินค้าขายดี</h2><div id="top"><div class="empty-state">กำลังโหลดข้อมูล...</div></div></section>
+</main><script src="/js/api.js"></script><script>
+requireRole('admin');
+const $=id=>document.getElementById(id);
+function money(v){return Number(v||0).toFixed(2)+' บาท'}
+async function safe(path){try{return await api(path)}catch(e){return {__error:e.message}}}
+async function load(){
+  const [f,a,s,r]=await Promise.all([safe('/analytics/forecast?days=90'),safe('/analytics/association'),safe('/analytics/sales?days=90'),safe('/analytics/production-recommendation?days=90')]);
+  let errors=[];
+  if(f.__error){$('forecast').innerHTML=`<div class="empty-state">โหลด Forecast ไม่สำเร็จ: ${esc(f.__error)}</div>`;errors.push('Forecast')}else{
+    const models=Array.isArray(f.models)?f.models:[];const best=models.find(x=>x.mae!==null)||models[0];
+    if(!best){$('forecast').innerHTML='<div class="empty-state">ยังไม่มีข้อมูลยอดขายสำหรับพยากรณ์</div>'}
+    else{$('forecast').innerHTML=`<div class="metric">${money(f.recommendation)} / วัน</div><div class="sub">โมเดล: ${esc(best.name)} · MAE: ${best.mae??'-'} · RMSE: ${best.rmse??'-'}</div><div class="forecast-list">${(best.next7||[]).map((v,i)=>`<div class="forecast-day"><span>วันที่ +${i+1}</span><b>${money(v)}</b></div>`).join('')}</div>`}
+  }
+  if(r.__error){$('rec').innerHTML=`<div class="empty-state">โหลดคำแนะนำการผลิตไม่สำเร็จ: ${esc(r.__error)}</div>`;errors.push('Production')}else if(!r.length){$('rec').innerHTML='<div class="empty-state">ยังไม่มีข้อมูลสินค้า/ยอดขายเพียงพอสำหรับแนะนำการผลิต</div>'}else{$('rec').innerHTML=`<div class="mini-list">${r.slice(0,8).map(x=>`<div class="mini-row"><span><b>${esc(x.name)}</b><br><span class="sub">เฉลี่ย ${Number(x.avg_daily_quantity).toFixed(1)} ชิ้น/วัน</span></span><b>${x.recommended_quantity} ชิ้น/วัน</b></div>`).join('')}</div>`}
+  if(a.__error){$('assoc').innerHTML=`<div class="empty-state">โหลด Association Rule ไม่สำเร็จ: ${esc(a.__error)}</div>`;errors.push('Association')}else if(!Array.isArray(a)||!a.length){$('assoc').innerHTML='<div class="empty-state">ยังมีข้อมูลไม่พอสำหรับหาความสัมพันธ์ของสินค้า ต้องมีออเดอร์ที่มีสินค้าตั้งแต่ 2 ชนิดขึ้นไป</div>'}else{$('assoc').innerHTML=`<div class="table-wrap"><table class="table"><tr><th>สินค้า A</th><th>สินค้า B</th><th>Support</th><th>Confidence</th><th>Lift</th></tr>${a.map(x=>`<tr><td>${esc(x.a)}</td><td>${esc(x.b)}</td><td>${x.support}</td><td>${x.confidence_a_to_b}</td><td>${x.lift}</td></tr>`).join('')}</table></div>`}
+  if(s.__error){$('top').innerHTML=`<div class="empty-state">โหลดสินค้าขายดีไม่สำเร็จ: ${esc(s.__error)}</div>`;errors.push('Sales')}else if(!s.top?.length){$('top').innerHTML='<div class="empty-state">ยังไม่มีข้อมูลการขาย</div>'}else{$('top').innerHTML=`<div class="mini-list">${s.top.map((x,i)=>`<div class="mini-row"><span><b>${i+1}. ${esc(x.name)}</b></span><span>${x.quantity} ชิ้น · ${money(x.sales)}</span></div>`).join('')}</div>`}
+  if(errors.length){$('msg').className='notice';$('msg').textContent='มีบางส่วนโหลดไม่สำเร็จ: '+errors.join(', ')}
+}
+load();
+</script></body></html>

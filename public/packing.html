@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Packing - THE ONE Bakery</title><link rel="stylesheet" href="/css/app.css"><style>
+.pack-flow{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.pack-step{padding:12px;border:1px solid #eadbc9;border-radius:10px;background:#fff}.pack-card{border-left:5px solid #7a4b31}.packed-card{border-left-color:#49744d}@media(max-width:700px){.pack-flow{grid-template-columns:1fr}}
+</style></head>
+<body><header class="top"><b>THE ONE Bakery · ฝ่ายแพ็ก (Packing)</b><nav><a href="/kitchen.html">Kitchen</a><a href="/admin.html">Admin</a><a href="#" onclick="logout()">ออกจากระบบ</a></nav></header>
+<main class="wrap">
+<div class="notice"><b>หน้าที่ของ Packing:</b> รอรับออเดอร์ที่ Kitchen ผลิตเสร็จ → แพ็กสินค้า → เมื่อลูกค้ามารับ กด “ลูกค้ารับแล้ว”</div>
+<section class="pack-flow"><div class="pack-step"><b>1 · รอจาก Kitchen</b><span class="muted">งานจะเข้ามาเมื่อ Kitchen กด “ผลิตเสร็จ / ส่งให้ Packing”</span></div><div class="pack-step"><b>2 · แพ็กและส่งมอบ</b><span class="muted">แพ็กเสร็จแล้วรอลูกค้ามารับ จากนั้นกด “ลูกค้ารับแล้ว”</span></div></section>
+<section class="card" style="margin-top:16px"><h2 style="margin-top:0">ออเดอร์ที่ต้องแพ็ก</h2><div id="waiting"></div></section>
+<section class="card" style="margin-top:16px"><h2 style="margin-top:0">แพ็กแล้ว · รอลูกค้ารับ</h2><div id="packed"></div></section>
+</main><script src="/js/api.js"></script><script>
+requireRole('packing');
+async function load(){try{const os=await api('/orders');const w=os.filter(x=>x.status==='ready_for_packing'),p=os.filter(x=>x.status==='packed');waiting.innerHTML=w.length?w.map(o=>`<div class="card pack-card" style="margin:10px 0"><div class="row" style="justify-content:space-between"><b>#${o.daily_no||o.id} · ${esc(o.customer_name||'ลูกค้า')}</b><span class="badge">รอแพ็ก</span></div><p>${o.items.map(i=>`${esc(i.name)} × ${i.quantity}`).join('<br>')}</p><button class="btn" onclick="next(${o.id},'packed')">✓ แพ็กเสร็จ / รอลูกค้ารับ</button></div>`).join(''):'<div class="empty">ยังไม่มีงานที่ต้องแพ็ก<br><span class="muted">ตอนนี้ต้องรอ Kitchen ผลิตเสร็จแล้วส่งงานเข้ามา</span></div>';packed.innerHTML=p.length?p.map(o=>`<div class="card packed-card" style="margin:10px 0"><div class="row" style="justify-content:space-between"><b>#${o.daily_no||o.id} · ${esc(o.customer_name||'ลูกค้า')}</b><span class="badge">แพ็กเสร็จ</span></div><p>${o.items.map(i=>`${esc(i.name)} × ${i.quantity}`).join('<br>')}</p><button class="btn success" onclick="next(${o.id},'picked_up')">✓ ลูกค้ารับแล้ว</button></div>`).join(''):'<div class="empty">ยังไม่มีออเดอร์ที่แพ็กเสร็จและรอลูกค้ารับ</div>'}catch(e){waiting.innerHTML=`<div class="error-box">โหลดงาน Packing ไม่สำเร็จ: ${esc(e.message)}</div>`}}
+async function next(id,status){try{await api('/orders/'+id+'/status',{method:'POST',body:JSON.stringify({status})});load()}catch(e){alert(e.message)}}
+load();setInterval(load,5000);
+</script></body></html>

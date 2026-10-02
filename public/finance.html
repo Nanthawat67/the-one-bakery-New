@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>การเงิน - THE ONE Bakery</title>
+<link rel="stylesheet" href="/css/app.css">
+<style>
+.finance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.finance-summary{border-left:5px solid #7a4b31}.finance-summary.net{background:#fff8e9}
+.finance-table-wrap{overflow-x:auto}.finance-table{width:100%;border-collapse:collapse;min-width:560px}.finance-table th,.finance-table td{padding:9px 10px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}.finance-table th{background:#faf6f0}.finance-note{padding:10px 12px;background:#f8f2e9;border-radius:10px;margin-bottom:14px}.positive{font-weight:800}.negative{font-weight:800}.mini-bars{display:grid;grid-template-columns:repeat(7,minmax(70px,1fr));gap:8px;align-items:end;min-height:150px}.mini-bar-item{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;min-width:0}.mini-bar-track{width:100%;max-width:70px;height:110px;background:#f0e5d8;border-radius:8px;display:flex;align-items:flex-end;overflow:hidden}.mini-bar-fill{width:100%;background:#7a4b31;min-height:2px}.mini-bar-label{font-size:12px;white-space:nowrap}.mini-bar-value{font-size:12px;font-weight:700;overflow-wrap:anywhere;text-align:center}
+@media(max-width:700px){.mini-bars{grid-template-columns:repeat(4,minmax(65px,1fr));overflow-x:auto}.finance-table{min-width:620px}}
+</style>
+</head>
+<body>
+<header class="top"><b>THE ONE Bakery · การเงิน</b><nav><a href="/admin.html">Admin</a><a href="/analytics.html">AI & Analytics</a><a href="#" onclick="logout()">ออกจากระบบ</a></nav></header>
+<main class="wrap">
+  <div class="row" style="justify-content:space-between;margin-bottom:12px"><div><h1 style="margin:0">ภาพรวมการเงิน</h1><div class="muted">ดูเงินเข้า–ออกของร้าน และรายการที่ต้องติดตาม</div></div><label class="muted2">วันที่ <input id="financeDate" type="date" onchange="load()"></label></div>
+  <div class="finance-note">หน้านี้ไม่ได้ทำซ้ำแค่ “ยอดขาย” จากหน้า Admin แต่รวมยอดขาย + รายรับอื่น − ค่าใช้จ่าย เพื่อให้เห็นเงินสุทธิของวันที่เลือก พร้อมดูว่าเงินออกไปกับหมวดไหน</div>
+  <section class="finance-grid">
+    <div class="card finance-summary"><div class="muted">ยอดขายจากออเดอร์</div><div id="sales" class="stat">0 ฿</div></div>
+    <div class="card finance-summary"><div class="muted">รายรับอื่น</div><div id="otherIncome" class="stat">0 ฿</div></div>
+    <div class="card finance-summary"><div class="muted">ค่าใช้จ่าย</div><div id="expense" class="stat">0 ฿</div></div>
+    <div class="card finance-summary net"><div class="muted">เงินสุทธิวันนี้</div><div id="net" class="stat">0 ฿</div></div>
+  </section>
+
+  <section class="card" style="margin-top:16px"><h2 style="margin-top:0">ยอดขายย้อนหลัง 7 วัน</h2><div id="sales7" class="mini-bars"></div></section>
+
+  <div class="grid" style="margin-top:16px">
+    <section class="card"><h2 style="margin-top:0">ค่าใช้จ่ายแยกตามหมวด</h2><div id="categories"></div></section>
+    <section class="card"><h2 style="margin-top:0">บันทึกรายรับ / รายจ่าย</h2><form id="f" class="form"><select id="type"><option value="expense">รายจ่าย</option><option value="income">รายรับอื่น</option></select><input id="category" placeholder="หมวดหมู่ เช่น วัตถุดิบ / ค่าไฟ" required><input id="amount" type="number" min="0" step="0.01" placeholder="จำนวนเงิน" required><input id="note" placeholder="หมายเหตุ"><button class="btn success">บันทึก</button></form></section>
+  </div>
+
+  <section class="card" style="margin-top:16px"><h2 style="margin-top:0">รายการที่บันทึกวันนี้</h2><div id="recent"></div></section>
+</main>
+<script src="/js/api.js"></script>
+<script>
+requireRole('admin');
+function localDateString(d=new Date()){const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,10)}
+financeDate.value=localDateString();
+function money(v){return Number(v||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})+' ฿'}
+function esc2(v){return esc(String(v??''))}
+async function load(){
+  try{
+    const d=await api('/finance?date='+encodeURIComponent(financeDate.value||localDateString()));
+    sales.textContent=money(d.sales);otherIncome.textContent=money(d.otherIncome);expense.textContent=money(d.expense);net.textContent=money(d.net);net.className='stat '+(Number(d.net)>=0?'positive':'negative');
+    const max=Math.max(...d.sales7.map(x=>Number(x.sales)||0),1);
+    sales7.innerHTML=d.sales7.map(x=>{const v=Number(x.sales)||0;const h=Math.max(2,Math.round(v/max*100));return `<div class="mini-bar-item"><div class="mini-bar-value">${money(v)}</div><div class="mini-bar-track"><div class="mini-bar-fill" style="height:${h}%"></div></div><div class="mini-bar-label">${x.date.slice(5)}</div></div>`}).join('');
+    const ex=d.categoryRows.filter(x=>x.type==='expense');
+    categories.innerHTML=ex.length?ex.map(x=>`<div class="row" style="justify-content:space-between;padding:9px 0;border-bottom:1px solid #eee"><span>${esc2(x.category)}</span><b>${money(x.amount)}</b></div>`).join(''):'<div class="muted">วันนี้ยังไม่มีรายจ่ายที่บันทึก</div>';
+    recent.innerHTML=d.recent.length?`<div class="finance-table-wrap"><table class="finance-table"><thead><tr><th>ประเภท</th><th>หมวดหมู่</th><th>จำนวนเงิน</th><th>หมายเหตุ</th></tr></thead><tbody>${d.recent.map(x=>`<tr><td>${x.type==='expense'?'รายจ่าย':'รายรับอื่น'}</td><td>${esc2(x.category)}</td><td>${money(x.amount)}</td><td>${esc2(x.note||'-')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">ยังไม่มีรายการบันทึกในวันนี้</div>';
+  }catch(e){recent.innerHTML=`<div class="error-box">โหลดข้อมูลการเงินไม่สำเร็จ: ${esc2(e.message)}</div>`}
+}
+f.onsubmit=async e=>{e.preventDefault();try{await api('/finance',{method:'POST',body:JSON.stringify({type:type.value,category:category.value,amount:Number(amount.value),note:note.value,transaction_date:financeDate.value})});f.reset();type.value='expense';await load()}catch(err){alert(err.message)}};
+load();
+</script>
+</body></html>

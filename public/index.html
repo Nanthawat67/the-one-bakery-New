@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>THE ONE Bakery</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .cart-float{position:sticky;bottom:14px;z-index:10;margin:18px 0;text-align:right}
+    .cart-float a{display:inline-block;text-decoration:none}
+    .product img{width:100%;height:180px;object-fit:cover;border-radius:10px;background:#eadbc9}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <b>THE ONE Bakery</b>
+    <nav><a href="/cart.html">ตะกร้า (<span id="navCount">0</span>)</a><a href="/track.html">ติดตามออเดอร์</a><a href="/login.html">จัดการร้าน</a></nav>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>สั่งขนมออนไลน์</h1>
+      <p class="muted">เลือกสินค้าและจำนวนที่ต้องการ จากนั้นกดตะกร้าเพื่อตรวจสอบรายการและกรอกข้อมูลผู้สั่งซื้อ</p>
+    </section>
+    <div id="msg"></div>
+    <section class="card" id="trackBox" style="margin:16px 0">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div><h3 style="margin:0 0 4px">ติดตามออเดอร์</h3><div class="muted">ดูสถานะออเดอร์ที่สั่งไว้ โดยไม่ต้องสั่งใหม่</div></div>
+        <a class="btn secondary" href="/track.html">เปิดหน้าติดตาม</a>
+      </div>
+      <div id="lastOrder" style="margin-top:12px"></div>
+    </section>
+    <div id="products" class="grid"></div>
+    <div class="cart-float"><a class="btn" href="/cart.html">ไปที่ตะกร้า · <span id="floatCount">0</span> ชิ้น</a></div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    let ps=[];
+    const productsEl=document.getElementById('products');
+    const msgEl=document.getElementById('msg');
+    const navCount=document.getElementById('navCount');
+    const floatCount=document.getElementById('floatCount');
+    const lastOrderEl=document.getElementById('lastOrder');
+
+    function getCart(){try{return JSON.parse(localStorage.getItem('the_one_cart')||'[]')}catch{return []}}
+    function saveCart(c){localStorage.setItem('the_one_cart',JSON.stringify(c));updateCount()}
+    function updateCount(){const n=getCart().reduce((s,x)=>s+Number(x.quantity||0),0);navCount.textContent=n;floatCount.textContent=n}
+    function money(v){return Number(v).toFixed(2)+' บาท'}
+    function renderLastOrder(){
+      let o=null; try{o=JSON.parse(localStorage.getItem('the_one_last_order')||'null')}catch{}
+      if(!o?.order_id){lastOrderEl.innerHTML='<div class="muted2">ยังไม่มีออเดอร์ที่บันทึกไว้ในเครื่องนี้ หากมีหมายเลขออเดอร์แล้ว <a href="/track.html">กดติดตามที่นี่</a></div>';return}
+      lastOrderEl.innerHTML=`<div class="notice"><b>ออเดอร์ล่าสุด #${esc(o.order_number||o.order_id)}</b><div class="muted2" style="margin-top:4px">วันที่ ${esc(o.order_date||'')}</div><div class="actions" style="margin-top:10px"><a class="btn" href="/track.html?id=${encodeURIComponent(o.order_id)}">ดูสถานะออเดอร์</a><a class="btn secondary" href="/track.html">ค้นหาออเดอร์อื่น</a></div></div>`;
+    }
+
+    function add(id){
+      const input=document.getElementById('q'+id);
+      const q=Math.max(0,Math.floor(Number(input.value)||0));
+      if(q<1){msgEl.className='notice';msgEl.textContent='กรุณาเลือกจำนวนสินค้าอย่างน้อย 1 ชิ้น';return;}
+      const cart=getCart();
+      const item=cart.find(x=>Number(x.product_id)===Number(id));
+      if(item)item.quantity+=q;else cart.push({product_id:Number(id),quantity:q});
+      saveCart(cart);
+      msgEl.className='notice';msgEl.textContent='เพิ่มสินค้าในตะกร้าแล้ว';
+    }
+
+    async function load(){
+      try{
+        ps=await api('/products');
+        productsEl.innerHTML=ps.map(p=>`
+          <div class="card product">
+            <img src="${esc(p.image_url||'')}" alt="${esc(p.name)}" onerror="this.style.display='none'">
+            <h3>${esc(p.name)}</h3>
+            <div class="price">${money(p.price)}</div>
+            <div class="row" style="margin-top:10px">
+              <input id="q${p.id}" type="number" min="0" value="0" style="width:70px">
+              <button class="btn" type="button" onclick="add(${p.id})">เพิ่มลงตะกร้า</button>
+            </div>
+          </div>`).join('');
+        updateCount();
+        renderLastOrder();
+      }catch(e){msgEl.className='notice';msgEl.textContent=e.message||'โหลดสินค้าไม่สำเร็จ'}
+    }
+    renderLastOrder();
+    load();
+  </script>
+</body>
+</html>
